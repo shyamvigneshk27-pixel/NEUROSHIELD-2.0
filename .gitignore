@@ -49,3 +49,7 @@ normal_sample.csv
 seizure_sample.csv
 tk.py
 convert.py
+
+# --- Backend runtime data (never commit patient uploads / DB) ---
+backend/neuroshield.db
+backend/uploads/

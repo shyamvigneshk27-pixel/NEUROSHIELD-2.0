@@ -1,41 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import jsPDF from 'jspdf';
-import { Download, FileText, Activity, ShieldAlert, BarChart3 } from 'lucide-react';
+import { Download, FileText, Activity, ShieldAlert, BarChart3, AlertTriangle } from 'lucide-react';
+import { authFetch, ApiError } from '../api';
 
-const ReportSummaryView = ({ signalData, spectrogram, riskScore, analysisResult, loading, onSummaryReady }) => {
+const ReportSummaryView = ({ riskScore, analysisResult, onSummaryReady, token }) => {
     const [summary, setSummary] = useState('');
     const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+    const [summaryError, setSummaryError] = useState('');
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [reportId] = useState(`NS-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`);
 
     useEffect(() => {
         setSummary('');
+        setSummaryError('');
         const fetchSummary = async () => {
             if (!analysisResult) return;
             setIsGeneratingSummary(true);
             try {
-                const response = await fetch('http://localhost:8000/summarize', {
+                const data = await authFetch('/summarize', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ analysis_result: analysisResult })
+                    body: JSON.stringify({ analysis_result: analysisResult }),
+                    token,
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    setSummary(data.summary);
-                    if (onSummaryReady) onSummaryReady(data.summary);
-                } else {
-                    setSummary('Failed to generate summary: ' + (data.detail || 'Unknown error'));
-                }
+                setSummary(data.summary);
+                if (onSummaryReady) onSummaryReady(data.summary);
             } catch (err) {
-                console.error('Error fetching summary:', err);
-                setSummary('Failed to connect to AI summarization service.');
+                setSummaryError(err instanceof ApiError && err.status === 401
+                    ? 'Your session expired. Please sign in again to generate a summary.'
+                    : (err.message || 'Could not reach the AI summarization service.'));
             } finally {
                 setIsGeneratingSummary(false);
             }
         };
         fetchSummary();
-    }, [analysisResult]);
+    }, [analysisResult, token]);
 
     // ── Programmatic multi-page PDF builder ───────────────────────────────────
     const buildPdf = (ar, rs, rid, sum) => {
@@ -132,11 +131,8 @@ const ReportSummaryView = ({ signalData, spectrogram, riskScore, analysisResult,
         txt('RISK SCORE', L + 65, y + 7, { size: 7, color: [150, 150, 150] });
         txt(`${rs?.toFixed?.(1) ?? '--'}%`, L + 65, y + 16, { size: 14, bold: true, color: lblCol });
 
-        txt('MODEL ACCURACY', L + 120, y + 7, { size: 7, color: [150, 150, 150] });
-        txt(`${ar?.model_accuracy ?? '--'}%`, L + 120, y + 16, { size: 12, bold: true, color: [220, 220, 220] });
-
-        txt('CONFIDENCE', L + 162, y + 7, { size: 7, color: [150, 150, 150] });
-        txt(`${ar?.confidence?.toFixed?.(1) ?? '--'}%`, L + 162, y + 16, { size: 12, bold: true, color: [220, 220, 220] });
+        txt('CONFIDENCE', L + 130, y + 7, { size: 7, color: [150, 150, 150] });
+        txt(`${ar?.confidence?.toFixed?.(1) ?? '--'}%`, L + 130, y + 16, { size: 12, bold: true, color: [220, 220, 220] });
         y += 30;
 
         // Band powers
@@ -241,26 +237,26 @@ const ReportSummaryView = ({ signalData, spectrogram, riskScore, analysisResult,
     if (!analysisResult) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                <Activity className="w-16 h-16 text-neon-green/20 mb-4 animate-pulse" />
-                <h2 className="text-xl font-bold text-gray-300">No Analysis Data Available</h2>
-                <p className="text-gray-500 mt-2">Please upload a scan in the Analysis tab first.</p>
+                <Activity className="w-16 h-16 text-[var(--secondary)]/20 mb-4 animate-pulse" />
+                <h2 className="text-xl font-bold text-[var(--text-secondary)]">No Analysis Data Available</h2>
+                <p className="text-[var(--text-secondary)] mt-2">Please upload a scan in the Analysis tab first.</p>
             </div>
         );
     }
 
     const isSeizure = analysisResult?.label === 'Seizure';
-    const labelColor = isSeizure ? 'text-red-400' : 'text-neon-green';
+    const labelColor = isSeizure ? 'text-red-400' : 'text-[var(--secondary)]';
     const isSpect = analysisResult?.mode === 'spectrogram';
 
     return (
         <div className="space-y-6">
             {/* Top Bar */}
             <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-black text-neon-green uppercase tracking-tighter">Report Summary</h2>
+                <h2 className="text-2xl font-black text-[var(--secondary)] uppercase tracking-tighter">Report Summary</h2>
                 <button
                     onClick={handleDownloadPdf}
                     disabled={isGeneratingPdf || isGeneratingSummary}
-                    className="flex flex-row items-center gap-2 bg-neon-green/20 text-neon-green border border-neon-green hover:bg-neon-green hover:text-black transition-all px-4 py-2 rounded-lg font-bold disabled:opacity-50"
+                    className="flex flex-row items-center gap-2 bg-[var(--secondary)]/20 text-[var(--secondary)] border border-[var(--secondary)] hover:bg-[var(--secondary)] hover:text-black transition-all px-4 py-2 rounded-lg font-bold disabled:opacity-50"
                 >
                     <Download className="w-5 h-5" />
                     {isGeneratingPdf ? 'Generating PDF...' : 'Download PDF Report'}
@@ -268,14 +264,14 @@ const ReportSummaryView = ({ signalData, spectrogram, riskScore, analysisResult,
             </div>
 
             {/* Report Preview */}
-            <div className="bg-[#0a0a0f] border border-white/5 p-8 rounded-2xl flex flex-col gap-6 text-gray-100 max-w-3xl mx-auto">
+            <div className="card p-6 md:p-8 flex flex-col gap-6 max-w-3xl mx-auto">
                 {/* Header */}
-                <div className="border-b border-white/10 pb-4 flex justify-between items-end">
+                <div className="border-b border-[var(--border)] pb-4 flex justify-between items-end">
                     <div>
-                        <h1 className="text-3xl font-black text-neon-green tracking-tighter uppercase">NeuroShield</h1>
-                        <p className="text-xs text-electric-purple font-bold tracking-widest uppercase mt-1">Clinical EEG Analysis Report</p>
+                        <h1 className="text-3xl font-black text-[var(--secondary)] tracking-tighter uppercase">NeuroShield</h1>
+                        <p className="text-xs text-[var(--primary)] font-bold tracking-widest uppercase mt-1">Clinical EEG Analysis Report</p>
                     </div>
-                    <div className="text-right text-xs text-gray-500 font-mono">
+                    <div className="text-right text-xs text-[var(--text-secondary)] font-mono">
                         Date: {new Date().toLocaleDateString()}<br />
                         ID: {reportId}<br />
                         Mode: {isSpect ? 'Spectrogram' : 'Raw EEG'}
@@ -283,16 +279,15 @@ const ReportSummaryView = ({ signalData, spectrogram, riskScore, analysisResult,
                 </div>
 
                 {/* Diagnosis */}
-                <div className={`rounded-xl p-4 border ${isSeizure ? 'border-red-500/20 bg-red-900/10' : 'border-neon-green/20 bg-neon-green/5'} grid grid-cols-2 md:grid-cols-4 gap-4`}>
+                <div className={`rounded-xl p-4 border ${isSeizure ? 'border-red-300 bg-red-50' : 'border-[var(--secondary)] bg-[var(--surface-muted)]'} grid grid-cols-1 sm:grid-cols-3 gap-4`}>
                     {[
-                        { label: 'Diagnosis', val: analysisResult.label, highlight: true },
+                        { label: 'Detected Pattern', val: analysisResult.label, highlight: true },
                         { label: 'Seizure Risk', val: `${riskScore?.toFixed(1)}%`, highlight: true },
-                        { label: 'Model Accuracy', val: `${analysisResult.model_accuracy}%` },
                         { label: 'Confidence', val: `${analysisResult.confidence?.toFixed(1)}%` },
                     ].map(({ label, val, highlight }) => (
                         <div key={label}>
-                            <span className="text-[9px] text-gray-500 uppercase font-black tracking-widest block">{label}</span>
-                            <span className={`text-xl font-black ${highlight ? labelColor : 'text-white'} uppercase`}>{val}</span>
+                            <span className="text-[9px] text-[var(--text-secondary)] uppercase font-black tracking-widest block">{label}</span>
+                            <span className={`text-xl font-black ${highlight ? labelColor : 'text-[var(--text-primary)]'} uppercase`}>{val}</span>
                         </div>
                     ))}
                 </div>
@@ -300,7 +295,7 @@ const ReportSummaryView = ({ signalData, spectrogram, riskScore, analysisResult,
                 {/* Band Powers */}
                 {analysisResult.bands && (
                     <div>
-                        <h3 className="flex items-center gap-2 text-[10px] font-black text-neon-green uppercase tracking-widest mb-3">
+                        <h3 className="flex items-center gap-2 text-[10px] font-black text-[var(--secondary)] uppercase tracking-widest mb-3">
                             <BarChart3 className="w-3 h-3" /> Frequency Band Analysis
                         </h3>
                         <div className="grid grid-cols-5 gap-2">
@@ -309,11 +304,11 @@ const ReportSummaryView = ({ signalData, spectrogram, riskScore, analysisResult,
                                 const colors = { delta: 'bg-green-400', theta: 'bg-blue-400', alpha: 'bg-indigo-400', beta: 'bg-orange-400', gamma: 'bg-red-400' };
                                 return (
                                     <div key={band} className="flex flex-col items-center gap-1">
-                                        <span className="text-[9px] font-black text-white">{pct.toFixed(1)}%</span>
-                                        <div className="w-full bg-white/5 rounded h-16 flex items-end">
+                                        <span className="text-[9px] font-black text-[var(--text-primary)]">{pct.toFixed(1)}%</span>
+                                        <div className="w-full bg-[var(--surface-muted)] rounded h-16 flex items-end">
                                             <div className={`w-full ${colors[band] || 'bg-purple-400'} rounded transition-all`} style={{ height: `${Math.max(4, pct)}%` }} />
                                         </div>
-                                        <span className="text-[8px] uppercase text-gray-400 font-black">{band}</span>
+                                        <span className="text-[8px] uppercase text-[var(--text-secondary)] font-black">{band}</span>
                                     </div>
                                 );
                             })}
@@ -324,15 +319,15 @@ const ReportSummaryView = ({ signalData, spectrogram, riskScore, analysisResult,
                 {/* Stats */}
                 {analysisResult.stats && (
                     <div>
-                        <h3 className="flex items-center gap-2 text-[10px] font-black text-neon-green uppercase tracking-widest mb-3">
+                        <h3 className="flex items-center gap-2 text-[10px] font-black text-[var(--secondary)] uppercase tracking-widest mb-3">
                             <ShieldAlert className="w-3 h-3" />
                             {isSpect ? 'Computed Spectral Features' : 'Computed Signal Parameters'}
                         </h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {Object.entries(analysisResult.stats).map(([key, val]) => (
-                                <div key={key} className="bg-white/5 border border-white/10 rounded-lg p-3">
-                                    <span className="text-[7px] text-gray-500 uppercase font-black tracking-widest block mb-1">{key.replace(/_/g, ' ')}</span>
-                                    <span className="text-sm font-black text-white">{typeof val === 'number' ? val.toFixed(4) : val}</span>
+                                <div key={key} className="bg-[var(--surface-muted)] border border-[var(--border)] rounded-lg p-3">
+                                    <span className="text-[7px] text-[var(--text-secondary)] uppercase font-black tracking-widest block mb-1">{key.replace(/_/g, ' ')}</span>
+                                    <span className="text-sm font-black text-[var(--text-primary)]">{typeof val === 'number' ? val.toFixed(4) : val}</span>
                                 </div>
                             ))}
                         </div>
@@ -340,25 +335,30 @@ const ReportSummaryView = ({ signalData, spectrogram, riskScore, analysisResult,
                 )}
 
                 {/* AI Summary */}
-                <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-                    <h3 className="flex items-center gap-2 text-lg font-bold text-electric-purple uppercase tracking-widest mb-4">
+                <div className="bg-[var(--surface-muted)] border border-[var(--border)] rounded-xl p-6">
+                    <h3 className="flex items-center gap-2 text-lg font-bold text-[var(--primary)] uppercase tracking-widest mb-4">
                         <FileText className="w-5 h-5" /> AI Clinical Summary
                     </h3>
                     {isGeneratingSummary ? (
-                        <div className="flex items-center gap-3 text-gray-400">
+                        <div className="flex items-center gap-3 text-[var(--text-secondary)]">
                             <Activity className="w-5 h-5 animate-spin" />
-                            <span>Generating neuro-clinical summary...</span>
+                            <span>Generating plain-language summary…</span>
+                        </div>
+                    ) : summaryError ? (
+                        <div className="flex items-start gap-2" style={{ color: 'var(--danger)' }}>
+                            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                            <span className="text-sm">{summaryError}</span>
                         </div>
                     ) : (
                         <div
-                            className="text-sm text-gray-300 leading-relaxed whitespace-pre-line"
-                            dangerouslySetInnerHTML={{ __html: summary.replace(/\*\*(.*?)\*\*/g, '<strong class="text-neon-green">$1</strong>') }}
+                            className="text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-line"
+                            dangerouslySetInnerHTML={{ __html: summary.replace(/\*\*(.*?)\*\*/g, '<strong class="text-[var(--secondary)]">$1</strong>') }}
                         />
                     )}
                 </div>
 
                 {/* Footer */}
-                <div className="pt-4 border-t border-white/10 text-[10px] text-gray-500 text-center">
+                <div className="pt-4 border-t border-[var(--border)] text-[10px] text-[var(--text-secondary)] text-center">
                     This report was generated using NeuroShield AI models. This is an assistive tool and does not replace professional medical diagnosis.
                 </div>
             </div>

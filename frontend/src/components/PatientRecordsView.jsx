@@ -1,99 +1,98 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Search, Filter, MoreVertical, User } from 'lucide-react';
-import { MOCK_PATIENTS } from '../mockData';
+import React, { useEffect, useState } from 'react';
+import { User, Users, AlertTriangle, RefreshCw } from 'lucide-react';
+import { authFetch } from '../api';
 
-const PatientRecordsView = () => {
+const RELATIONSHIP_LABELS = {
+    self: 'You',
+    caregiver_of: 'You are the caregiver',
+    assigned_neurologist: 'Assigned to you',
+    admin: 'All patients',
+};
+
+const PatientRecordsView = ({ token }) => {
+    const [patients, setPatients] = useState(null); // null = loading
+    const [error, setError] = useState('');
+    const [reloadKey, setReloadKey] = useState(0);
+
+    useEffect(() => {
+        let cancelled = false;
+        authFetch('/patients/mine', { token })
+            .then((data) => { if (!cancelled) { setPatients(data); setError(''); } })
+            .catch((err) => { if (!cancelled) setError(err.message || 'Could not load patient records.'); });
+        return () => { cancelled = true; };
+    }, [token, reloadKey]);
+
+    const reload = () => {
+        setPatients(null);
+        setError('');
+        setReloadKey((k) => k + 1);
+    };
+
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h3 className="text-2xl font-bold text-white">Patient Records</h3>
-                <div className="flex gap-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                        <input
-                            type="text"
-                            placeholder="Search patients..."
-                            className="bg-eclipse/50 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-neon-purple/50 w-64"
-                        />
-                    </div>
-                    <button className="glass-panel px-4 py-2 flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
-                        <Filter className="w-4 h-4" />
-                        Filter
-                    </button>
-                </div>
+            <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Patient Records</h3>
+                <button onClick={reload} className="btn btn-secondary text-xs px-3 py-2">
+                    <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                </button>
             </div>
 
-            <div className="glass-panel overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="border-b border-white/5 bg-white/5">
-                            <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Patient</th>
-                            <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Age/Gender</th>
-                            <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Last Visit</th>
-                            <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Status</th>
-                            <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Risk Level</th>
-                            <th className="p-4 w-10"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {MOCK_PATIENTS.map((patient, idx) => (
-                            <motion.tr
-                                key={patient.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: idx * 0.05 }}
-                                className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group"
-                            >
-                                <td className="p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-neon-purple/20 flex items-center justify-center">
-                                            <User className="w-5 h-5 text-neon-purple" />
+            {error && (
+                <div className="card p-6 flex flex-col items-center gap-2 text-center" style={{ borderColor: 'var(--danger)' }}>
+                    <AlertTriangle className="w-6 h-6" style={{ color: 'var(--danger)' }} />
+                    <p className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>Couldn't load this list</p>
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{error}</p>
+                    <button onClick={reload} className="btn btn-secondary text-xs mt-2">Retry</button>
+                </div>
+            )}
+
+            {!error && patients === null && (
+                <div className="card p-10 flex items-center justify-center">
+                    <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--border)', borderTopColor: 'var(--secondary)' }} />
+                </div>
+            )}
+
+            {!error && patients && patients.length === 0 && (
+                <div className="card p-10 flex flex-col items-center gap-2 text-center">
+                    <Users className="w-8 h-8" style={{ color: 'var(--text-secondary)', opacity: 0.5 }} />
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>No linked patients yet</p>
+                    <p className="text-sm max-w-sm" style={{ color: 'var(--text-secondary)' }}>
+                        Patient-caregiver and patient-neurologist linking is managed by an administrator during onboarding.
+                    </p>
+                </div>
+            )}
+
+            {!error && patients && patients.length > 0 && (
+                <div className="card overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[480px]">
+                        <thead>
+                            <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
+                                <th className="p-4 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Patient</th>
+                                <th className="p-4 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Email</th>
+                                <th className="p-4 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Relationship</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {patients.map((p) => (
+                                <tr key={p.id} className="border-b" style={{ borderColor: 'var(--border)' }}>
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'rgba(69,123,157,0.10)' }}>
+                                                <User className="w-4 h-4" style={{ color: 'var(--secondary)' }} />
+                                            </div>
+                                            <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{p.full_name}</span>
                                         </div>
-                                        <div>
-                                            <div className="font-semibold text-white">{patient.name}</div>
-                                            <div className="text-xs text-gray-500">{patient.id}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="p-4 text-sm text-gray-400">
-                                    {patient.age} / {patient.gender}
-                                </td>
-                                <td className="p-4 text-sm text-gray-400">
-                                    {patient.lastVisit}
-                                </td>
-                                <td className="p-4">
-                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${patient.status === 'Stable' ? 'bg-green-500/10 text-green-400' :
-                                            patient.status === 'Critical' ? 'bg-red-500/10 text-red-400' :
-                                                'bg-blue-500/10 text-blue-400'
-                                        }`}>
-                                        {patient.status}
-                                    </span>
-                                </td>
-                                <td className="p-4">
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full ${patient.risk === 'High' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' :
-                                                        patient.risk === 'Moderate' ? 'bg-orange-500' :
-                                                            'bg-green-500'
-                                                    }`}
-                                                style={{ width: patient.risk === 'High' ? '85%' : patient.risk === 'Moderate' ? '45%' : '15%' }}
-                                            />
-                                        </div>
-                                        <span className="text-xs font-bold text-gray-400 w-8">{patient.risk}</span>
-                                    </div>
-                                </td>
-                                <td className="p-4">
-                                    <button className="p-2 hover:bg-white/10 rounded-lg text-gray-500 hover:text-white transition-all">
-                                        <MoreVertical className="w-4 h-4" />
-                                    </button>
-                                </td>
-                            </motion.tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                                    </td>
+                                    <td className="p-4 text-sm" style={{ color: 'var(--text-secondary)' }}>{p.email}</td>
+                                    <td className="p-4">
+                                        <span className="badge badge-info">{RELATIONSHIP_LABELS[p.relationship] || p.relationship}</span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 };

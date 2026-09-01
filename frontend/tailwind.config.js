@@ -7,43 +7,47 @@ export default {
     theme: {
         extend: {
             colors: {
-                midnight: "#020617",
-                "deep-midnight": "#01040a",
-                "neon-cyan": "#00E5FF",
-                "neon-green": "#39FF14",
-                "electric-purple": "#7C3AED",
-                "neon-purple": "#a78bfa",
-                "neon-blue": "#00E5FF",
-                "success-green": "#22C55E",
-                "alert-red": "#EF4444",
-                "glass": "rgba(255, 255, 255, 0.03)",
-                "glass-white": "rgba(255, 255, 255, 0.08)",
-                "glass-dark": "rgba(0, 0, 0, 0.2)",
+                // --- Mandatory NeuroShield palette ---
+                honeydew: "#f1faee",
+                "frosted-blue": "#a8dadc",
+                cerulean: "#457b9d",
+                "oxford-navy": "#1d3557",
+
+                background: "var(--background)",
+                surface: "var(--surface)",
+                "surface-muted": "var(--surface-muted)",
+                primary: "var(--primary)",
+                secondary: "var(--secondary)",
+                accent: "var(--accent)",
+                "text-primary": "var(--text-primary)",
+                "text-secondary": "var(--text-secondary)",
+                border: "var(--border)",
+                success: "var(--success)",
+                warning: "var(--warning)",
+                danger: "var(--danger)",
             },
             fontFamily: {
-                sans: ['Inter', 'sans-serif'],
+                sans: ['Inter', 'system-ui', 'sans-serif'],
             },
-            animation: {
-                'pulse-slow': 'pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                'drift': 'drift 20s ease-in-out infinite',
-                'glow-pulse': 'glow-pulse 4s ease-in-out infinite',
-                'waveform': 'waveform 10s linear infinite',
+            boxShadow: {
+                card: '0 1px 2px rgba(29, 53, 87, 0.06), 0 1px 3px rgba(29, 53, 87, 0.08)',
+                'card-hover': '0 4px 12px rgba(29, 53, 87, 0.10)',
+                focus: '0 0 0 3px rgba(69, 123, 157, 0.25)',
             },
             keyframes: {
-                drift: {
-                    '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
-                    '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
-                    '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                'fade-in': {
+                    '0%': { opacity: 0, transform: 'translateY(4px)' },
+                    '100%': { opacity: 1, transform: 'translateY(0)' },
                 },
-                'glow-pulse': {
-                    '0%, 100%': { opacity: 0.3, filter: 'blur(100px)' },
-                    '50%': { opacity: 0.6, filter: 'blur(130px)' },
+                'pulse-soft': {
+                    '0%, 100%': { opacity: 1 },
+                    '50%': { opacity: 0.55 },
                 },
-                waveform: {
-                    '0%': { transform: 'translateX(0)' },
-                    '100%': { transform: 'translateX(-50%)' },
-                }
-            }
+            },
+            animation: {
+                'fade-in': 'fade-in 0.25s ease-out',
+                'pulse-soft': 'pulse-soft 2.2s ease-in-out infinite',
+            },
         },
     },
     plugins: [],

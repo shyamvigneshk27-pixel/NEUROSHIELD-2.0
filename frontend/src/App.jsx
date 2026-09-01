@@ -6,25 +6,30 @@ import SettingsView from './components/SettingsView';
 import Login from './components/Login';
 import AdminView from './components/AdminView';
 import ReportSummaryView from './components/ReportSummaryView';
-import ModelMetricsView from './components/ModelMetricsView';
+import { API_BASE, authFetch, ApiError } from './api';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [activeTab, setActiveTab] = useState('Analysis');
 
   // ML States
   const [signalData, setSignalData] = useState(null);
-  const [spectrogram, setSpectrogram] = useState(null);
   const [riskScore, setRiskScore] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const [loginSessions, setLoginSessions] = useState([]);
   const [analysisHistory, setAnalysisHistory] = useState([]);
 
   // Persistence check
   useEffect(() => {
-    const saved = localStorage.getItem('neuro_user');
-    if (saved) setCurrentUser(JSON.parse(saved));
+    const savedUser = localStorage.getItem('neuro_user');
+    const savedToken = localStorage.getItem('neuro_token');
+    if (savedUser && savedToken) {
+      setCurrentUser(JSON.parse(savedUser));
+      setToken(savedToken);
+    }
 
     const sessions = localStorage.getItem('neuro_sessions');
     if (sessions) setLoginSessions(JSON.parse(sessions));
@@ -33,7 +38,6 @@ function App() {
     if (history) setAnalysisHistory(JSON.parse(history));
   }, []);
 
-  // Push a new record into persistent history
   const pushHistory = (record) => {
     setAnalysisHistory(prev => {
       const updated = [record, ...prev].slice(0, 50);
@@ -42,19 +46,19 @@ function App() {
     });
   };
 
-  const handleLogin = (user) => {
+  const handleLogin = ({ token: newToken, user }) => {
+    setToken(newToken);
     setCurrentUser(user);
+    localStorage.setItem('neuro_token', newToken);
     localStorage.setItem('neuro_user', JSON.stringify(user));
 
     const newSession = {
       id: Date.now(),
-      user: user.name,
+      user: user.full_name,
       role: user.role,
-      loginTime: user.loginTime || new Date().toLocaleString(),
+      loginTime: new Date().toLocaleString(),
       status: 'Active',
-      ip: '127.0.0.1',
     };
-
     const updatedSessions = [newSession, ...loginSessions.slice(0, 19)];
     setLoginSessions(updatedSessions);
     localStorage.setItem('neuro_sessions', JSON.stringify(updatedSessions));
@@ -63,80 +67,57 @@ function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setToken(null);
     localStorage.removeItem('neuro_user');
+    localStorage.removeItem('neuro_token');
   };
 
-  const handleCsvUpload = async (file) => {
+  // Called when the API rejects our token (expired/invalid) -- fail safe, not silently.
+  const handleAuthExpired = () => {
+    handleLogout();
+    setUploadError('Your session expired. Please sign in again.');
+  };
+
+  const runUpload = async (file, endpoint, inputType) => {
     setLoading(true);
+    setUploadError('');
+
     const formData = new FormData();
     formData.append('file', file);
+    if (currentUser?.role === 'patient') {
+      formData.append('patient_id', currentUser.id);
+    }
 
     try {
-      const response = await fetch('http://localhost:8000/analyze/csv', { method: 'POST', body: formData });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || 'Server error');
+      const data = await authFetch(endpoint, { method: 'POST', body: formData, token });
 
-      setSignalData(data.raw_signal);
-      setRiskScore(data.prediction.risk_score);
-      setAnalysisResult(data.prediction);
+      setSignalData(data.raw_signal || data.prediction?.raw_signal || null);
+      setRiskScore(data.prediction?.risk_score ?? null);
+      setAnalysisResult(data.prediction || null);
 
       pushHistory({
         id: Date.now(),
         timestamp: new Date().toLocaleString(),
-        inputType: 'csv',
+        inputType,
         filename: file.name,
-        user: currentUser?.name || 'Unknown',
+        user: currentUser?.full_name || 'Unknown',
         prediction: data.prediction,
         aiSummary: '',
       });
     } catch (error) {
-      console.error('Error uploading CSV:', error);
-      alert(error.message || 'Failed to analyze CSV. Ensure backend is running.');
+      if (error instanceof ApiError && error.status === 401) {
+        handleAuthExpired();
+      } else {
+        setUploadError(error.message || `Failed to analyze ${inputType.toUpperCase()}.`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleImageUpload = async (file) => {
-    setLoading(true);
-    setSignalData(null);
+  const handleCsvUpload = (file) => runUpload(file, '/analyze/csv', 'csv');
+  const handleImageUpload = (file) => runUpload(file, '/analyze/image', 'image');
 
-    const reader = new FileReader();
-    reader.onloadend = () => setSpectrogram(reader.result);
-    reader.readAsDataURL(file);
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const response = await fetch('http://localhost:8000/analyze/image', { method: 'POST', body: formData });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || data.detail || 'Server failed to analyze image');
-
-      setRiskScore(data.prediction.risk_score);
-      setAnalysisResult(data.prediction);
-
-      const signal = data.raw_signal || data.prediction.raw_signal;
-      if (signal && Array.isArray(signal) && signal.length > 0) setSignalData(signal);
-
-      pushHistory({
-        id: Date.now(),
-        timestamp: new Date().toLocaleString(),
-        inputType: 'image',
-        filename: file.name,
-        user: currentUser?.name || 'Unknown',
-        prediction: data.prediction,
-        aiSummary: '',
-      });
-    } catch (error) {
-      console.error('Error analyzing image:', error);
-      alert(error.message || 'Failed to analyze Image.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Called by ReportSummaryView when Gemini summary becomes available
   const handleSummaryReady = (summary) => {
     setAnalysisHistory(prev => {
       if (prev.length === 0) return prev;
@@ -153,39 +134,38 @@ function App() {
         return (
           <AnalysisView
             signalData={signalData}
-            spectrogram={spectrogram}
             riskScore={riskScore}
             analysisResult={analysisResult}
             loading={loading}
+            uploadError={uploadError}
             handleCsvUpload={handleCsvUpload}
             handleImageUpload={handleImageUpload}
+            token={token}
           />
         );
       case 'Patient Records':
-        return <PatientRecordsView />;
+        return <PatientRecordsView token={token} />;
       case 'Report Summary':
         return (
           <ReportSummaryView
             signalData={signalData}
-            spectrogram={spectrogram}
             riskScore={riskScore}
             analysisResult={analysisResult}
             loading={loading}
             onSummaryReady={handleSummaryReady}
+            token={token}
           />
         );
-      case 'Model Metrics':
-        return <ModelMetricsView />;
       case 'System Admin':
         return <AdminView sessions={loginSessions} analysisHistory={analysisHistory} />;
       case 'Settings':
-        return <SettingsView />;
+        return <SettingsView user={currentUser} />;
       default:
         return <AnalysisView />;
     }
   };
 
-  if (!currentUser) {
+  if (!currentUser || !token) {
     return <Login onLogin={handleLogin} />;
   }
 

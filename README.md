@@ -37,6 +37,8 @@ Epilepsy affects tens of millions of people worldwide, and diagnosing seizure ac
 
 This is **not** a certified medical device. It's a portfolio/research-grade demonstration of an end-to-end ML product: data → model → inference API → interactive dashboard.
 
+> **v2 upgrade in progress.** The platform is moving to the multi-channel **CHB-MIT** EEG corpus, real JWT auth with Patient / Caregiver / Neurologist / Admin roles, a device-agnostic real-time monitoring gateway, n8n care-coordination workflows, and a mobile app. See [`V2_MASTER_PLAN.md`](./V2_MASTER_PLAN.md) for the full plan. This branch contains the **foundations pass**: JWT auth + SQLite/SQLAlchemy DB + ownership checks, an explicit CORS allowlist, secure file uploads, an `/analyze/edf` EDF pipeline (metadata + preprocessing; multi-channel model not trained yet), and a rebuilt clinical UI on the mandated color system. Spectrogram-image visualizations and user-facing model-accuracy metrics have been removed.
+
 ## What it does
 
 - **Accepts two input types:**
@@ -46,12 +48,12 @@ This is **not** a certified medical device. It's a portfolio/research-grade demo
 - **Produces a structured report:**
   - Binary classification: `Seizure` vs `Normal`
   - A calibrated **risk score** (0–100%)
-  - Model **confidence** and reported **accuracy**
+  - Model **confidence**
   - **Band-power breakdown** across the five classical EEG frequency bands (delta, theta, alpha, beta, gamma)
   - Signal statistics (mean, std, min/max, zero-crossings, variance)
 - **Generates a clinician-readable AI summary** of the report using Google's Gemini API.
-- **Provides a chat assistant** ("NeuroShield AI") that can explain the current report or define EEG/neurology terminology, with a rule-based fallback if Gemini isn't configured.
-- **Dashboard UI** with role-based login (admin/technician), signal viewer, spectrogram viewer, risk gauge, patient records view, and model metrics view.
+- **Provides a chat assistant** that can explain the current report or define EEG/neurology terminology, with a rule-based fallback if Gemini isn't configured.
+- **Dashboard UI** on the mandated clinical color system, with JWT login and role-scoped navigation (Patient / Caregiver / Neurologist / Admin), EEG waveform viewer, risk gauge, band-power charts, patient records, and downloadable reports. Model-performance metrics and spectrogram-image cards have been removed from the product UI.
 
 ## Who it's for
 
@@ -185,11 +187,15 @@ cd backend
 cp .env.example .env   # on Windows: copy .env.example .env
 ```
 
-Then open `backend/.env` and set your own key:
+Then open `backend/.env` and set your values. At minimum:
 
 ```
-GEMINI_API_KEY=your_actual_key_here
+GEMINI_API_KEY=your_actual_key_here      # optional (AI summary/chat)
+JWT_SECRET_KEY=                           # generate: python -c "import secrets; print(secrets.token_urlsafe(48))"
+CORS_ORIGINS=http://localhost:5173        # explicit allowlist; never "*"
 ```
+
+On first startup the backend creates `backend/neuroshield.db` and (when `SEED_DEMO_USERS=true`) seeds one demo account per role. The console prints the seeded emails and the `DEMO_PASSWORD`.
 
 ### 3. Frontend setup
 
@@ -221,11 +227,19 @@ The dashboard will be live at `http://localhost:5173` (default Vite port).
 
 | Variable         | Location            | Required? | Description                                                                 |
 |-------------------|----------------------|-----------|-------------------------------------------------------------------------------|
-| `GEMINI_API_KEY`  | `backend/.env`       | Optional  | Enables AI-generated report summaries and the smart chat assistant. Without it, the app falls back to a static, rule-based chat responder and a "not configured" message for summaries. |
+| `GEMINI_API_KEY`  | `backend/.env`       | Optional  | Enables AI-generated report summaries and the chat assistant. Without it, the app falls back to a static, rule-based responder. |
+| `JWT_SECRET_KEY`  | `backend/.env`       | Recommended | Signs session tokens. If unset, a random key is generated per process (dev only — invalidates sessions on restart). **Set explicitly for any shared deployment.** |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `backend/.env` | Optional | Token lifetime in minutes (default `480`). |
+| `DATABASE_URL`    | `backend/.env`       | Optional  | SQLAlchemy URL. Defaults to `sqlite:///backend/neuroshield.db`. |
+| `CORS_ORIGINS`    | `backend/.env`       | Optional  | Comma-separated exact origins allowed to call the API. Default `http://localhost:5173`. Never `*`. |
+| `SEED_DEMO_USERS` / `DEMO_PASSWORD` | `backend/.env` | Optional | When `true` (default), seeds one demo user per role on first run if the DB is empty. Disable for shared deployments. |
+| `VITE_API_BASE`   | `frontend/.env.local` | Optional | Backend base URL the frontend calls. Default `http://localhost:8000`. |
 
-**Never commit your real `.env` file.** The repo's `.gitignore` already excludes `backend/.env`; only `backend/.env.example` (a template) should be tracked.
+**Never commit your real `.env` file.** `.gitignore` excludes `backend/.env`, `frontend/.env*`, `backend/neuroshield.db`, and `backend/uploads/`; only the `.env.example` templates are tracked.
 
 ## Screenshots
+
+> The screenshots below show the **v1** interface (dark theme, spectrogram views, model-metrics dashboard). The foundations pass replaces this with a light clinical UI on the `#f1faee / #a8dadc / #457b9d / #1d3557` palette and removes the spectrogram and model-metrics screens; captures will be refreshed.
 
 <table>
 <tr>
@@ -274,27 +288,33 @@ The dashboard will be live at `http://localhost:5173` (default Vite port).
 
 ## Using the app
 
-1. Open the frontend and log in. Demo credentials (hardcoded for this demo — see [Known limitations](#known-limitations)):
-   - **Admin:** `admin` / `admin123`
-   - **Technician:** `user` / `user123`
-2. From the dashboard, go to **Upload** and submit either:
-   - A CSV with a numeric signal column (at least 178 samples), or
-   - An EEG spectrogram image.
-3. View the generated report: classification, risk score, band powers, and signal stats.
-4. Optionally click **Summarize** for an AI-generated clinical write-up, or open the **chat widget** to ask questions about the result.
+1. Open the frontend and sign in (or create an account). Demo accounts seeded on first backend run — password is the `DEMO_PASSWORD` printed in the backend console (default `NeuroDemo#2026`):
+   - **Patient:** `patient@neuroshield.dev`
+   - **Caregiver:** `caregiver@neuroshield.dev` (linked to the demo patient)
+   - **Neurologist:** `neurologist@neuroshield.dev` (assigned to the demo patient)
+   - **Admin:** `admin@neuroshield.dev`
+2. From **Analysis**, upload a CSV with a numeric signal column (at least 178 samples). EDF recordings can be sent to `POST /analyze/edf` (metadata + preprocessing; the multi-channel CHB-MIT model is not trained yet).
+3. View the generated report: detected pattern, risk score, band powers, and signal stats.
+4. Optionally open **Report Summary** for an AI-generated plain-language write-up, or use the **assistant** to ask about the result.
 
 ## API reference
 
 Base URL: `http://localhost:8000`
 
-| Method | Endpoint         | Description                                                            |
-|--------|-------------------|--------------------------------------------------------------------------|
-| `POST` | `/login`          | Authenticates a user against hardcoded admin/technician credentials.     |
-| `POST` | `/analyze/csv`    | Accepts a CSV file, runs LSTM/RF inference, returns a prediction report. |
-| `POST` | `/analyze/image`  | Accepts an image file, runs CNN inference, returns a prediction report.  |
-| `POST` | `/summarize`      | Accepts an analysis result JSON, returns a Gemini-generated summary.     |
-| `POST` | `/chat`           | Accepts a user query (+ optional report context), returns an assistant reply. |
-| `GET`  | `/health`         | Returns model load status and diagnostics — useful for verifying setup.  |
+All endpoints except `/health` and `/auth/*` require an `Authorization: Bearer <token>` header.
+
+| Method | Endpoint         | Auth | Description                                                            |
+|--------|-------------------|------|--------------------------------------------------------------------------|
+| `POST` | `/auth/register` | –    | Creates a Patient / Caregiver / Neurologist account, returns a JWT.     |
+| `POST` | `/auth/login`    | –    | Email + password → JWT (bcrypt-verified against the DB).               |
+| `GET`  | `/auth/me`       | ✔    | Returns the current user.                                              |
+| `GET`  | `/patients/mine` | ✔    | Patients linked to the caller (self / caregiver / neurologist / admin). |
+| `POST` | `/analyze/csv`   | ✔    | CSV signal → LSTM/RF inference. Ownership-checked; stores a record + audit log. |
+| `POST` | `/analyze/image` | ✔    | Image → CNN inference. Ownership-checked.                             |
+| `POST` | `/analyze/edf`   | ✔    | EDF → metadata + 18-ch montage match + preprocessing + signal-quality. Returns `model_status: "not_available"` (no CHB-MIT model yet). |
+| `POST` | `/summarize`     | ✔    | Analysis result JSON → Gemini-generated summary.                      |
+| `POST` | `/chat`          | ✔    | User query (+ optional context) → assistant reply.                    |
+| `GET`  | `/health`        | –    | Model load status and diagnostics.                                   |
 
 Full interactive documentation (request/response schemas) is available at `/docs` once the backend is running.
 
@@ -333,9 +353,11 @@ Use `scripts/verify_models.py` to sanity-check that retrained weights load and p
 
 ## Known limitations
 
-- **Authentication is hardcoded** for demo purposes (`admin`/`admin123`, `user`/`user123`) — there is no real user database, password hashing, or session management. Do not use this login flow in a production/public deployment.
-- **CORS is fully open** (`allow_origins=["*"]`) — fine for local development, but should be restricted before any public deployment.
-- Risk scores are calibrated/scaled for clinical-style presentation rather than being raw model probabilities — they're meant to be illustrative, not diagnostic.
+- **No CHB-MIT model yet.** `/analyze/edf` completes the full architecture (secure upload → metadata → montage match → preprocessing → signal quality) but returns `model_status: "not_available"` — no risk score is fabricated for EDF recordings until a trained checkpoint (`backend/ml/models/eegnet_chbmit.pt`) is added.
+- **CSV/image inference still uses the v1 Bonn-trained models.** Risk scores from those are calibrated/scaled for clinical-style presentation, not raw probabilities — illustrative, not diagnostic.
+- **Demo seeding is on by default** (`SEED_DEMO_USERS=true`) with a shared `DEMO_PASSWORD`. Disable both for any shared deployment and register real accounts.
+- Patient ↔ caregiver / neurologist links are currently created only by the seed script; a self-service linking flow is planned.
+- `AdminView` and the PDF report generator retain some legacy styling and are slated for the next redesign pass.
 - This project is a research/demo prototype, not a validated clinical tool (see [Disclaimer](#disclaimer)).
 
 ## Troubleshooting

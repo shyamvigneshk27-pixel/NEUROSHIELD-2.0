@@ -1,107 +1,184 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/* ------------------------------------------------------------------ */
+/* Design tokens -- mandatory NeuroShield color system.                */
+/* Every color in the app should trace back to one of these variables. */
+/* ------------------------------------------------------------------ */
+:root {
+  --honeydew: #f1faee;
+  --frosted-blue: #a8dadc;
+  --cerulean: #457b9d;
+  --oxford-navy: #1d3557;
+
+  --background: var(--honeydew);
+  --surface: #ffffff;
+  --surface-muted: #eef7f5;
+  --primary: var(--oxford-navy);
+  --secondary: var(--cerulean);
+  --accent: var(--frosted-blue);
+
+  --text-primary: #172033;
+  --text-secondary: #526070;
+  --border: #d7e5e5;
+
+  --success: #2f855a;
+  --warning: #c0841a;
+  --danger: #c53030;
+
+  color-scheme: light;
+}
+
 @layer base {
+  html, body, #root {
+    height: 100%;
+  }
+
   body {
-    @apply bg-midnight text-slate-100 font-sans antialiased;
-    cursor: default;
-    background-image:
-      radial-gradient(at 0% 0%, rgba(57, 255, 20, 0.05) 0, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(124, 58, 237, 0.03) 0, transparent 50%);
-    background-attachment: fixed;
-    transition: all 0.3s ease-in-out;
+    @apply font-sans antialiased;
+    background: var(--background);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--primary);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--secondary);
+    outline-offset: 2px;
   }
 }
 
-.grain-overlay {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  opacity: 0.02;
-  pointer-events: none;
+/* ------------------------------------------------------------------ */
+/* Shared surface / control primitives                                */
+/* ------------------------------------------------------------------ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px rgba(29, 53, 87, 0.06);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.glass-panel {
-  @apply bg-black/3 backdrop-blur-lg border border-white/[0.05] rounded-2xl transition-all duration-300 ease-in-out;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.01);
+.card:hover {
+  box-shadow: 0 4px 12px rgba(29, 53, 87, 0.10);
 }
 
-.glass-panel:hover {
-  @apply border-neon-green/20 bg-black/10 scale-[1.01];
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.2),
-    inset 0 0 0 1px rgba(57, 255, 20, 0.05);
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.65rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  cursor: pointer;
 }
 
-.glow-button {
-  @apply bg-neon-green/10 text-neon-green border border-neon-green/50 rounded-xl px-6 py-3 font-bold uppercase tracking-widest transition-all duration-300 ease-in-out;
-  box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
-.glow-button:hover {
-  @apply bg-neon-green/20 scale-[1.05];
-  box-shadow: 0 0 20px rgba(57, 255, 20, 0.5);
+.btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+  border: 1px solid var(--primary);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #16294a;
 }
 
-.neon-text {
-  @apply text-white;
-  text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+.btn-secondary {
+  background: var(--surface);
+  color: var(--primary);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--secondary);
+  background: var(--surface-muted);
 }
 
-.hover-glow:hover {
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+.btn-danger {
+  background: var(--danger);
+  color: #ffffff;
+  border: 1px solid var(--danger);
+}
+.btn-danger:hover:not(:disabled) {
+  background: #a52626;
 }
 
-.animate-shimmer {
-  background: linear-gradient(90deg,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.05) 50%,
-      rgba(255, 255, 255, 0) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 2s infinite linear;
+.input-field {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input-field.pl-10, .input-field.has-icon-left {
+  padding-left: 2.75rem !important;
+}
+.input-field.pr-12, .input-field.has-icon-right {
+  padding-right: 3rem !important;
+}
+.input-field::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+.input-field:focus {
+  outline: none;
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(69, 123, 157, 0.18);
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-success { background: rgba(47, 133, 90, 0.12); color: var(--success); }
+.badge-warning { background: rgba(192, 132, 26, 0.14); color: var(--warning); }
+.badge-danger  { background: rgba(197, 48, 48, 0.12); color: var(--danger); }
+.badge-info    { background: rgba(69, 123, 157, 0.12); color: var(--secondary); }
+.badge-neutral { background: var(--surface-muted); color: var(--text-secondary); }
 
-  100% {
-    background-position: 200% 0;
-  }
+.status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  display: inline-block;
 }
 
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  @apply bg-midnight;
-}
-
+/* Custom scrollbar -- subtle, not neon */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  @apply bg-white/10 rounded-full transition-colors;
+  background: var(--border);
+  border-radius: 999px;
 }
+::-webkit-scrollbar-thumb:hover { background: var(--secondary); }
 
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-neon-purple/50;
+/* Reduced-motion consideration (section 33) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

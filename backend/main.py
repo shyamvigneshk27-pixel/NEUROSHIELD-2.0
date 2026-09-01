@@ -1,12 +1,10 @@
 
-# Force Reload: v4 (Vision Enhancement)
-import datetime 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+# Force Reload: v5 (Auth + DB + secure uploads)
+import datetime
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
-import pandas as pd
-import numpy as np
 import json
 import random
 import sys
@@ -36,19 +34,45 @@ except ImportError:
     # Fallback for different execution contexts
     from .ml.inference import Predictor
 
+from app.core.config import settings
+from app.db.database import get_db, init_db, SessionLocal
+from app.db.seed import seed_demo_data
+from app.auth.dependencies import get_current_user
+from app.api.auth_routes import router as auth_router
+from app.api.analysis_routes import register_analysis_routes
+from app.api.edf_routes import router as edf_router
+from app.api.patients_routes import router as patients_router
+
 app = FastAPI(title="NeuroShield API", description="AI Backend for Seizure Prediction")
 
-# CORS
+# CORS -- explicit allowlist only. Never "*" (see app/core/config.py CORS_ORIGINS).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+def _on_startup():
+    init_db()
+    db = SessionLocal()
+    try:
+        seed_demo_data(db)
+    finally:
+        db.close()
+
+
 # Initialize ML
 predictor = Predictor()
+
+# Auth + DB-backed analysis/EDF routers
+app.include_router(auth_router)
+app.include_router(edf_router)
+app.include_router(patients_router)
+register_analysis_routes(app, predictor)
 
 # Load Medical Terms
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -70,128 +94,9 @@ class ChatRequest(BaseModel):
 class SummarizeRequest(BaseModel):
     analysis_result: dict
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-    role: str # 'admin' or 'user'
-
-@app.post("/login")
-async def login(request: LoginRequest):
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    if request.username == "admin" and request.password == "admin123" and request.role == "admin":
-        print(f"[AUTH] Admin login successful: {request.username} at {current_time}")
-        return {
-            "status": "success", 
-            "user": {
-                "name": "Administrator", 
-                "role": "admin",
-                "loginTime": current_time
-            }
-        }
-    elif request.username == "user" and request.password == "user123" and request.role == "user":
-        print(f"[AUTH] User login successful: {request.username} at {current_time}")
-        return {
-            "status": "success", 
-            "user": {
-                "name": "EEG Technician", 
-                "role": "user",
-                "loginTime": current_time
-            }
-        }
-    else:
-        print(f"[AUTH] Login FAILED: {request.username} (Role: {request.role}) at {current_time}")
-        raise HTTPException(status_code=401, detail="Invalid credentials for the selected role.")
-
-@app.post("/analyze/csv")
-async def analyze_csv(file: UploadFile = File(...)):
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a CSV.")
-    
-    try:
-        # Read with no header initially to check content
-        df = pd.read_csv(file.file, header=None)
-        
-        # Robust signal extraction:
-        # 1. Check if it's wide format (many columns) or long format (many rows, few columns)
-        
-        # Read a few rows to determine format
-        file.file.seek(0)
-        df_peek = pd.read_csv(file.file, nrows=5)
-        
-        if df_peek.shape[1] >= 178:
-            # Wide format (Original/Synthetic)
-            file.file.seek(0)
-            df = pd.read_csv(file.file)
-            # Find first numeric row and take first 178 numeric columns
-            signal_data = df.select_dtypes(include=[np.number]).iloc[0].values[:178].astype(float)
-        else:
-            # Long format (Raw recordings: time, channel_1)
-            file.file.seek(0)
-            df = pd.read_csv(file.file)
-            
-            # Find a column that looks like signal (usually the second column or named channel_*)
-            signal_col = None
-            for col in df.columns:
-                if 'channel' in col.lower() or 'signal' in col.lower() or 'val' in col.lower():
-                    signal_col = col
-                    break
-            
-            if signal_col is None:
-                # Fallback: find first numeric column that isn't 'time' or 'id'
-                numeric_cols = df.select_dtypes(include=[np.number]).columns
-                for col in numeric_cols:
-                    if 'time' not in col.lower() and 'id' not in col.lower():
-                        signal_col = col
-                        break
-            
-            if signal_col is None and not df.select_dtypes(include=[np.number]).empty:
-                 signal_col = df.select_dtypes(include=[np.number]).columns[0]
-
-            if signal_col:
-                signal_data = df[signal_col].values[:178].astype(float)
-            else:
-                raise HTTPException(status_code=400, detail="Could not find numeric signal column in CSV.")
-
-        if len(signal_data) < 178:
-             raise HTTPException(status_code=400, detail=f"Insufficient data points. Need 178, found {len(signal_data)}")
-             
-        prediction = predictor.predict_csv(signal_data)
-        
-        print(f"[ANALYSIS] CSV Processed: {file.filename}")
-        print(f" > Result: {prediction.get('label')} (Risk: {prediction.get('risk_score'):.2f}%)")
-        
-        return {
-            "filename": file.filename,
-            "prediction": prediction,
-            "raw_signal": signal_data.tolist(),
-            "message": "Analysis complete."
-        }
-            
-    except Exception as e:
-        import traceback
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error processing CSV: {str(e)}")
-
-@app.post("/analyze/image")
-async def analyze_image(file: UploadFile = File(...)):
-    if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="Invalid file type. Please upload an image.")
-    
-    try:
-        contents = await file.read()
-        prediction = predictor.predict_image(contents)
-        
-        print(f"[ANALYSIS] Image Processed: {file.filename}")
-        print(f" > Result: {prediction.get('label')} (Risk: {prediction.get('risk_score'):.2f}%)")
-        
-        return {
-            "filename": file.filename,
-            "prediction": prediction,
-            "raw_signal": prediction.get("raw_signal", []),
-            "message": "Image Analysis complete."
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+# NOTE: hardcoded /login and unauthenticated /analyze/csv, /analyze/image were
+# removed in favor of app/api/auth_routes.py (JWT, bcrypt, DB-backed users) and
+# app/api/analysis_routes.py (auth + ownership-checked, secure file storage).
 
 @app.get("/health")
 async def health_check():
@@ -220,7 +125,7 @@ async def health_check():
 
 
 @app.post("/summarize")
-async def summarize_report(request: SummarizeRequest):
+async def summarize_report(request: SummarizeRequest, current_user=Depends(get_current_user)):
     if not genai_client:
         return {"summary": "Gemini API is not configured. Please set GEMINI_API_KEY in backend/.env file."}
     
@@ -247,7 +152,7 @@ async def summarize_report(request: SummarizeRequest):
         raise HTTPException(status_code=500, detail="Failed to generate summary via Gemini API.")
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, current_user=Depends(get_current_user)):
     query = request.query.lower()
     
     if genai_client:

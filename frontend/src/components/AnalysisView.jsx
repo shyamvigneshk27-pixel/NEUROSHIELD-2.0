@@ -1,20 +1,26 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import UploadSection from './UploadSection';
 import SignalViewer from './SignalViewer';
-import SpectrogramView from './SpectrogramView';
 import RiskGauge from './RiskGauge';
 import ChatWidget from './ChatWidget';
-import { LayoutDashboard, Activity, BarChart3, ShieldAlert, BadgeInfo } from 'lucide-react';
+import { LayoutDashboard, Activity, BarChart3, ShieldAlert, BadgeInfo, AlertTriangle } from 'lucide-react';
+
+const BAND_RANGES = {
+    delta: '0.5–4 Hz', theta: '4–8 Hz', alpha: '8–13 Hz', beta: '13–30 Hz', gamma: '30+ Hz',
+};
+const BAND_COLORS = {
+    delta: 'var(--secondary)', theta: 'var(--primary)', alpha: 'var(--accent)',
+    beta: 'var(--warning)', gamma: 'var(--danger)',
+};
 
 const AnalysisView = ({
     signalData,
-    spectrogram,
     riskScore,
     analysisResult,
     loading,
+    uploadError,
     handleCsvUpload,
-    handleImageUpload
+    token,
 }) => {
     const [subTab, setSubTab] = useState('Overview');
 
@@ -22,194 +28,137 @@ const AnalysisView = ({
         { id: 'Overview', icon: LayoutDashboard },
         { id: 'Signal Graphs', icon: Activity },
         { id: 'Frequency Analysis', icon: BarChart3 },
-        { id: 'AI Risk Score', icon: ShieldAlert },
-        { id: 'AI Assistant', icon: BadgeInfo }
+        { id: 'Risk Assessment', icon: ShieldAlert },
+        { id: 'AI Assistant', icon: BadgeInfo },
     ];
 
     const renderSubTabContent = () => {
         switch (subTab) {
             case 'Overview':
                 return (
-                    <div className="space-y-8">
-                        <div className="glass-panel p-8 border-neon-green/10">
-                            <h3 className="text-xl font-black text-neon-green mb-6 flex items-center gap-3 tracking-tighter uppercase">
-                                <span className="w-8 h-8 rounded-lg bg-neon-green/10 flex items-center justify-center text-neon-green border border-neon-green/30 shadow-[0_0_15px_rgba(57,255,20,0.2)]">1</span>
-                                Neural Signal Input
+                    <div className="space-y-6">
+                        <div className="card p-6 md:p-8">
+                            <h3 className="text-base font-bold mb-5 flex items-center gap-3" style={{ color: 'var(--text-primary)' }}>
+                                <span className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold" style={{ background: 'rgba(69,123,157,0.10)', color: 'var(--secondary)' }}>1</span>
+                                Upload EEG Signal
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <UploadSection onUpload={handleCsvUpload} type="csv" label="EEG Signal (CSV)" />
-                                <UploadSection onUpload={handleImageUpload} type="image" label="Spectrogram (IMG)" />
-                            </div>
+                            <UploadSection
+                                onUpload={handleCsvUpload}
+                                type="csv"
+                                label="EEG Signal (CSV)"
+                                hint="178-sample raw signal window, wide or long format"
+                            />
                         </div>
 
-                        {analysisResult && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="glass-panel p-6"
-                            >
+                        {uploadError && (
+                            <div className="card p-4 flex items-start gap-3" style={{ borderColor: 'var(--danger)' }}>
+                                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--danger)' }} />
+                                <div>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>Analysis failed</p>
+                                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{uploadError}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {loading && (
+                            <div className="card p-6 flex items-center gap-3">
+                                <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--border)', borderTopColor: 'var(--secondary)' }} />
+                                <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Processing signal…</span>
+                            </div>
+                        )}
+
+                        {!loading && analysisResult && (
+                            <div className="card p-6 animate-fade-in">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h4 className="text-[10px] font-black text-neon-green/60 uppercase tracking-[0.2em]">Raw Neural Matrix</h4>
-                                    <span className="text-[10px] bg-neon-green/10 text-neon-green px-2 py-1 rounded border border-neon-green/20 uppercase font-black tracking-widest">Authorized Data</span>
+                                    <h4 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Monitoring Summary</h4>
+                                    <span className={`badge ${analysisResult.label === 'Seizure' ? 'badge-danger' : 'badge-success'}`}>
+                                        {analysisResult.label || 'Analyzed'}
+                                    </span>
                                 </div>
-                                <div className="bg-black/20 rounded-xl p-4 border border-neon-green/10 max-h-64 overflow-y-auto backdrop-blur-md">
-                                    <pre className="text-xs text-neon-green/80 font-mono scrollbar-hide">
-                                        {JSON.stringify(analysisResult, null, 2)}
-                                    </pre>
-                                </div>
-                            </motion.div>
+                                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                                    NeuroShield detected a signal pattern consistent with{' '}
+                                    <strong>{analysisResult.label === 'Seizure' ? 'elevated seizure-related activity' : 'stable neural activity'}</strong>.
+                                    This result is intended to support review by a qualified healthcare professional and is not a medical diagnosis.
+                                </p>
+                            </div>
                         )}
                     </div>
                 );
+
             case 'Signal Graphs':
                 return (
-                    <div className="space-y-8 h-full">
-                        <div className="h-[350px]">
-                            <SignalViewer data={signalData} loading={loading} mode={analysisResult?.mode} />
-                        </div>
-                        <div className="h-[350px]">
-                            <SpectrogramView imageUrl={spectrogram} rawData={signalData} />
-                        </div>
+                    <div className="h-[420px]">
+                        <SignalViewer data={signalData} loading={loading} />
                     </div>
                 );
-            case 'Frequency Analysis':
-                const bandRanges = {
-                    delta: "0.5 - 4 Hz",
-                    theta: "4 - 8 Hz",
-                    alpha: "8 - 13 Hz",
-                    beta: "13 - 30 Hz",
-                    gamma: "30+ Hz"
-                };
 
+            case 'Frequency Analysis':
                 return (
-                    <div className="glass-panel p-8 min-h-[400px]">
-                        <div className="flex items-center justify-between mb-8">
-                            <div>
-                                <h4 className="text-xl font-black text-neon-green mb-1 tracking-tighter uppercase">Oscillation Band Map</h4>
-                                <p className="text-xs text-slate-400 font-medium tracking-wide">Spectral power distribution across neural oscillation bands.</p>
-                            </div>
-                            {analysisResult?.bands && (
-                                <div className="text-right">
-                                    <span className="text-[10px] text-electric-purple uppercase font-black tracking-widest block mb-1">Peak Frequency</span>
-                                    <span className="text-2xl font-black text-neon-green uppercase tracking-tighter drop-shadow-[0_0_10px_rgba(57,255,20,0.4)]">
-                                        {Object.entries(analysisResult.bands).reduce((a, b) => a[1] > b[1] ? a : b)[0]}
-                                    </span>
-                                </div>
-                            )}
+                    <div className="card p-6 md:p-8 min-h-[400px]">
+                        <div className="mb-8">
+                            <h4 className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Oscillation Band Map</h4>
+                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Spectral power distribution across neural oscillation bands.</p>
                         </div>
 
                         {analysisResult?.bands ? (
-                            <div className="flex items-end justify-between gap-6 h-64 mt-16 px-4">
+                            <div className="flex items-end justify-between gap-4 md:gap-6 h-56 px-2">
                                 {Object.entries(analysisResult.bands).map(([band, value]) => {
                                     const percentage = typeof value === 'number' ? value : 0;
                                     return (
-                                        <div key={band} className="flex-1 flex flex-col items-center group h-full relative">
-                                            {/* Fixed-height percentage label area */}
-                                            <div className="absolute -top-12 left-0 right-0 flex flex-col items-center">
-                                                <div className="text-[11px] font-black text-white bg-black/60 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 shadow-lg mb-1">
+                                        <div key={band} className="flex-1 flex flex-col items-center h-full relative">
+                                            <div className="absolute -top-8 left-0 right-0 flex justify-center">
+                                                <span className="text-[11px] font-bold px-2 py-0.5 rounded" style={{ background: 'var(--surface-muted)', color: 'var(--text-primary)' }}>
                                                     {percentage.toFixed(1)}%
-                                                </div>
-                                                <div className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {bandRanges[band]}
-                                                </div>
+                                                </span>
                                             </div>
-
                                             <div className="w-full flex flex-col justify-end h-full">
-                                                <motion.div
-                                                    initial={{ height: 0 }}
-                                                    animate={{ height: `${Math.max(8, Math.min(100, percentage))}%` }}
-                                                    className={`w-full rounded-t-xl transition-all shadow-lg relative overflow-hidden ${band === 'delta' ? 'bg-gradient-to-t from-green-600 to-green-400' :
-                                                        band === 'theta' ? 'bg-gradient-to-t from-blue-600 to-blue-400' :
-                                                            band === 'alpha' ? 'bg-gradient-to-t from-indigo-600 to-indigo-400' :
-                                                                band === 'beta' ? 'bg-gradient-to-t from-orange-600 to-orange-400' :
-                                                                    'bg-gradient-to-t from-red-600 to-red-400'
-                                                        }`}
-                                                >
-                                                    <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                </motion.div>
+                                                <div
+                                                    className="w-full rounded-t-lg transition-[height] duration-500"
+                                                    style={{ height: `${Math.max(8, Math.min(100, percentage))}%`, background: BAND_COLORS[band] || 'var(--secondary)' }}
+                                                />
                                             </div>
-
-                                            <div className="mt-4 flex flex-col items-center">
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-white transition-colors">{band}</span>
+                                            <div className="mt-3 text-center">
+                                                <span className="text-xs font-bold uppercase" style={{ color: 'var(--text-primary)' }}>{band}</span>
+                                                <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{BAND_RANGES[band]}</p>
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
                         ) : (
-                            <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-neon-green/10 rounded-2xl bg-black/20 backdrop-blur-sm">
-                                <Activity className="w-12 h-12 text-neon-green/20 mb-4 animate-pulse" />
-                                <span className="text-gray-400 font-black uppercase tracking-widest text-xs">Awaiting Neural Spectral Data</span>
-                                <p className="text-[10px] text-gray-600 mt-2 text-center max-w-xs px-4 leading-relaxed">Spectral bands and statistics are calculated from telemetry. For spectrogram images, these are derived from visual pattern estimation.</p>
+                            <div className="h-56 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed" style={{ borderColor: 'var(--border)' }}>
+                                <Activity className="w-8 h-8" style={{ color: 'var(--text-secondary)', opacity: 0.5 }} />
+                                <span className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>No spectral data yet</span>
+                                <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-secondary)' }}>Upload an EEG signal to compute oscillation band power.</p>
                             </div>
                         )}
-
-                        <div className="mt-16 pt-8 border-t border-white/5">
-                            <h5 className="text-[10px] font-black text-neon-green/60 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
-                                <Activity className="w-3 h-3" />
-                                {analysisResult?.mode === 'spectrogram' ? 'Computed Spectral Features (JSON Derived)' : 'Computed Signal Parameters (JSON Derived)'}
-                            </h5>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                                {analysisResult?.stats && Object.entries(analysisResult.stats).map(([stat, val]) => (
-                                    <div key={stat} className="bg-black/20 p-4 rounded-xl border border-white/5 backdrop-blur-sm group hover:border-neon-green/30 transition-colors">
-                                        <span className="text-[7px] text-gray-500 uppercase font-black tracking-widest block mb-1 group-hover:text-neon-green/60 transition-colors">
-                                            {stat.replace(/_/g, ' ')}
-                                        </span>
-                                        <div className="text-sm font-black text-white tracking-tighter">
-                                            {typeof val === 'number' ? val.toFixed(3) : val}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
                     </div>
                 );
-            case 'AI Risk Score':
+
+            case 'Risk Assessment':
                 return (
-                    <div className="flex flex-col items-center justify-center glass-panel p-12 min-h-[400px] space-y-8">
+                    <div className="card p-6 md:p-10 flex items-center justify-center min-h-[360px]">
                         <div className="w-full max-w-sm">
                             <RiskGauge score={riskScore} />
                         </div>
-
-                        {analysisResult?.model_accuracy && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="w-full max-w-sm bg-neon-blue/10 border border-neon-blue/20 rounded-2xl p-6"
-                            >
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] text-neon-green uppercase font-black tracking-[0.2em]">Neural Engine Accuracy</span>
-                                    <span className="text-xl font-black text-neon-green drop-shadow-[0_0_10px_rgba(57,255,20,0.4)]">{analysisResult.model_accuracy}%</span>
-                                </div>
-                                <div className="w-full bg-neon-green/10 h-1.5 rounded-full overflow-hidden border border-neon-green/20">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${analysisResult.model_accuracy}%` }}
-                                        className="h-full bg-neon-green shadow-[0_0_15px_rgba(57,255,20,0.6)]"
-                                    />
-                                </div>
-                                <p className="text-[9px] text-slate-500 mt-4 leading-relaxed font-bold italic tracking-wider">
-                                    * Risk analysis based on statistical mapping of neuro-oscillatory patterns. 95%+ indicates critical seizure threshold validation.
-                                </p>
-                            </motion.div>
-                        )}
                     </div>
                 );
+
             case 'AI Assistant':
                 return (
-                    <div className="h-[600px] glass-panel p-2 overflow-hidden flex flex-col">
-                        <ChatWidget context={analysisResult ? JSON.stringify(analysisResult) : null} />
+                    <div className="card overflow-hidden">
+                        <ChatWidget context={analysisResult ? JSON.stringify(analysisResult) : null} token={token} />
                     </div>
                 );
+
             default:
                 return null;
         }
     };
 
     return (
-        <div className="space-y-8">
-            {/* Sub Tabs Navigation */}
-            <div className="flex flex-wrap gap-2 p-1 bg-white/[0.02] border border-white/[0.05] rounded-2xl w-fit backdrop-blur-md">
+        <div className="space-y-6">
+            <div className="flex flex-wrap gap-1 p-1 rounded-2xl w-fit" style={{ background: 'var(--surface-muted)' }}>
                 {subTabs.map(tab => {
                     const Icon = tab.icon;
                     const isActive = subTab === tab.id;
@@ -217,10 +166,10 @@ const AnalysisView = ({
                         <button
                             key={tab.id}
                             onClick={() => setSubTab(tab.id)}
-                            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${isActive
-                                ? 'bg-neon-green/10 text-neon-green border border-neon-green/30 shadow-[0_0_20px_rgba(57,255,20,0.2)]'
-                                : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                }`}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                            style={isActive
+                                ? { background: 'var(--surface)', color: 'var(--primary)', boxShadow: '0 1px 2px rgba(29,53,87,0.10)' }
+                                : { color: 'var(--text-secondary)' }}
                         >
                             <Icon className="w-4 h-4" />
                             {tab.id}
@@ -229,18 +178,9 @@ const AnalysisView = ({
                 })}
             </div>
 
-            {/* Sub Tab Content */}
-            <AnimatePresence mode="wait">
-                <motion.div
-                    key={subTab}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
-                >
-                    {renderSubTabContent()}
-                </motion.div>
-            </AnimatePresence>
+            <div key={subTab} className="animate-fade-in">
+                {renderSubTabContent()}
+            </div>
         </div>
     );
 };

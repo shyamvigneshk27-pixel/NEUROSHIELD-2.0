@@ -1,141 +1,155 @@
 import React from 'react';
-import { Activity, Brain, FileText, Settings, Menu, LogOut, Shield, BarChart2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Activity, Brain, FileText, Settings, LogOut, Shield, Circle } from 'lucide-react';
 import BackgroundDecorations from './BackgroundDecorations';
 
+const NAV_BY_ROLE = {
+    admin: [
+        { id: 'Patient Records', icon: Brain, label: 'Patients' },
+        { id: 'Analysis', icon: FileText, label: 'Analysis' },
+        { id: 'Report Summary', icon: Activity, label: 'Reports' },
+        { id: 'System Admin', icon: Shield, label: 'Admin' },
+        { id: 'Settings', icon: Settings, label: 'Settings' },
+    ],
+    neurologist: [
+        { id: 'Patient Records', icon: Brain, label: 'Patients' },
+        { id: 'Analysis', icon: FileText, label: 'Analysis' },
+        { id: 'Report Summary', icon: Activity, label: 'Reports' },
+        { id: 'Settings', icon: Settings, label: 'Settings' },
+    ],
+    caregiver: [
+        { id: 'Analysis', icon: FileText, label: 'Monitoring' },
+        { id: 'Report Summary', icon: Activity, label: 'Reports' },
+        { id: 'Settings', icon: Settings, label: 'Settings' },
+    ],
+    patient: [
+        { id: 'Analysis', icon: FileText, label: 'Analysis' },
+        { id: 'Report Summary', icon: Activity, label: 'Reports' },
+        { id: 'Settings', icon: Settings, label: 'Settings' },
+    ],
+};
+
+const ROLE_LABELS = {
+    patient: 'Patient',
+    caregiver: 'Caregiver',
+    neurologist: 'Neurologist',
+    admin: 'Administrator',
+};
+
 const DashboardLayout = ({ children, activeTab, onTabChange, user, onLogout }) => {
-    const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
-
-    const handleMouseMove = (e) => {
-        setMousePos({ x: e.clientX, y: e.clientY });
-    };
-
-    // Filtered tabs based on role
-    const menuItems = user?.role === 'admin'
-        ? [
-            { id: 'Patient Records', icon: Brain },
-            { id: 'Analysis', icon: FileText },
-            { id: 'Report Summary', icon: Activity },
-            { id: 'Model Metrics', icon: BarChart2 },
-            { id: 'System Admin', icon: Shield },
-            { id: 'Settings', icon: Settings }
-        ]
-        : [
-            { id: 'Analysis', icon: FileText },
-            { id: 'Report Summary', icon: Activity },
-            { id: 'Model Metrics', icon: BarChart2 },
-            { id: 'Settings', icon: Settings }
-        ];
+    const menuItems = NAV_BY_ROLE[user?.role] || NAV_BY_ROLE.patient;
 
     return (
-        <div className="flex h-screen bg-deep-midnight overflow-hidden text-gray-100 font-sans cursor-default">
+        <div className="flex h-screen overflow-hidden" style={{ color: 'var(--text-primary)' }}>
             <BackgroundDecorations />
 
-            {/* Sidebar */}
-            <motion.aside
-                initial={{ x: -100, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="w-20 lg:w-64 bg-white/[0.01] backdrop-blur-xl border-r border-white/5 flex flex-col items-center lg:items-start py-8 z-40 transition-all duration-500"
+            {/* Sidebar -- desktop / tablet */}
+            <aside
+                className="hidden md:flex w-20 lg:w-64 flex-col items-center lg:items-start py-6 z-40 border-r"
+                style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
             >
-                <div className="mb-12 px-6 flex items-center gap-3">
-                    <motion.div
-                        whileHover={{ rotate: 15, scale: 1.1 }}
-                        className="p-2 bg-neon-green/10 rounded-xl shadow-[0_0_20px_rgba(57,255,20,0.2)]"
-                    >
-                        <Brain className="w-8 h-8 text-neon-green" />
-                    </motion.div>
-                    <span className="hidden lg:block text-2xl font-bold bg-gradient-to-r from-white via-white to-gray-500 bg-clip-text text-transparent">
-                        NEUROSHIELD
+                <div className="mb-10 px-5 flex items-center gap-3">
+                    <div className="p-2 rounded-xl" style={{ background: 'rgba(69,123,157,0.10)' }}>
+                        <Brain className="w-7 h-7" style={{ color: 'var(--primary)' }} />
+                    </div>
+                    <span className="hidden lg:block text-xl font-extrabold tracking-tight" style={{ color: 'var(--primary)' }}>
+                        NeuroShield
                     </span>
                 </div>
 
-                <nav className="w-full space-y-2 px-3">
+                <nav className="w-full space-y-1 px-3" aria-label="Primary">
                     {menuItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = item.id === activeTab;
-
                         return (
-                            <motion.button
+                            <button
                                 key={item.id}
                                 onClick={() => onTabChange(item.id)}
-                                whileHover={{ x: 4, backgroundColor: "rgba(255, 255, 255, 0.05)" }}
-                                whileTap={{ scale: 0.98 }}
-                                className={`flex items-center gap-4 w-full p-4 rounded-xl transition-all duration-300 group relative ${isActive
-                                    ? 'bg-neon-green/10 text-neon-green shadow-[0_0_20px_rgba(57,255,20,0.1)] border border-neon-green/20'
-                                    : 'text-gray-400 hover:text-white'
-                                    }`}
+                                aria-current={isActive ? 'page' : undefined}
+                                className="flex items-center gap-4 w-full p-3.5 rounded-xl transition-colors duration-150 text-sm font-semibold"
+                                style={isActive
+                                    ? { background: 'rgba(69,123,157,0.10)', color: 'var(--primary)' }
+                                    : { color: 'var(--text-secondary)' }}
                             >
-                                <Icon className={`w-6 h-6 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                                <span className="hidden lg:block font-medium">{item.id}</span>
-                                {isActive && (
-                                    <motion.div
-                                        layoutId="activeTab"
-                                        className="absolute left-0 w-1 h-6 bg-neon-green rounded-r-full shadow-[0_0_10px_rgba(57,255,20,1)]"
-                                    />
-                                )}
-                            </motion.button>
+                                <Icon className="w-5 h-5 shrink-0" />
+                                <span className="hidden lg:block">{item.label}</span>
+                            </button>
                         );
                     })}
                 </nav>
 
-                <div className="mt-auto w-full px-3 pb-4">
-                    <motion.button
+                <div className="mt-auto w-full px-3">
+                    <button
                         onClick={onLogout}
-                        whileHover={{ backgroundColor: "rgba(220, 38, 38, 0.1)", color: "#ef4444" }}
-                        className="flex items-center gap-4 w-full p-4 rounded-xl text-gray-400 transition-all duration-300 group"
+                        className="flex items-center gap-4 w-full p-3.5 rounded-xl text-sm font-semibold transition-colors"
+                        style={{ color: 'var(--danger)' }}
                     >
-                        <LogOut className="w-6 h-6" />
-                        <span className="hidden lg:block font-medium">Log Out</span>
-                    </motion.button>
+                        <LogOut className="w-5 h-5 shrink-0" />
+                        <span className="hidden lg:block">Log Out</span>
+                    </button>
                 </div>
-            </motion.aside>
+            </aside>
 
             {/* Main Content */}
             <main className="flex-1 flex flex-col relative overflow-hidden z-10">
-                {/* Header */}
-                <motion.header
-                    initial={{ y: -20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/5 backdrop-blur-xl z-20"
+                <header
+                    className="h-16 md:h-20 border-b flex items-center justify-between px-4 md:px-8 z-20 shrink-0"
+                    style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
                 >
-                    <div className="flex flex-col">
-                        <h2 className="text-xl font-black text-neon-green tracking-tighter drop-shadow-[0_0_10px_rgba(57,255,20,0.3)]">NeuroShield AI</h2>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-neon-green/80 uppercase tracking-[0.2em] font-bold">Neural Engine v2.0</span>
-                            <span className="w-1 h-1 bg-neon-green/30 rounded-full" />
-                            <span className="text-[10px] text-electric-purple uppercase tracking-[0.2em] font-bold">{user?.role} Access</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                        <div className="flex flex-col items-end">
-                            <span className="text-sm font-black text-neon-green">{user?.name}</span>
-                            <span className="text-[10px] text-electric-purple/80 uppercase tracking-widest font-bold">{user?.role}</span>
-                        </div>
-                        <motion.div
-                            whileHover={{ scale: 1.05, ring: 4 }}
-                            className="w-11 h-11 rounded-full bg-gradient-to-tr from-neon-green to-neon-blue p-[2px] cursor-pointer shadow-[0_0_15px_rgba(57,255,20,0.2)]"
-                        >
-                            <div className="w-full h-full rounded-full bg-black/80 p-1">
-                                <div className="w-full h-full rounded-full bg-neon-green/10 flex items-center justify-center text-neon-green font-bold text-xs">
-                                    {user?.name?.[0]}
-                                </div>
+                    <div className="flex items-center gap-3">
+                        <Brain className="w-6 h-6 md:hidden" style={{ color: 'var(--primary)' }} />
+                        <div className="flex flex-col">
+                            <h2 className="text-base md:text-lg font-bold" style={{ color: 'var(--primary)' }}>{activeTab}</h2>
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                                <Circle className="w-2 h-2 fill-current" style={{ color: 'var(--success)' }} />
+                                <span>System Online</span>
                             </div>
-                        </motion.div>
+                        </div>
                     </div>
-                </motion.header>
+                    <div className="flex items-center gap-3 md:gap-4">
+                        <div className="hidden sm:flex flex-col items-end">
+                            <span className="text-sm font-bold" style={{ color: 'var(--primary)' }}>{user?.full_name}</span>
+                            <span className="text-[11px] font-semibold" style={{ color: 'var(--secondary)' }}>{ROLE_LABELS[user?.role] || user?.role}</span>
+                        </div>
+                        <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
+                            style={{ background: 'var(--primary)', color: '#fff' }}
+                        >
+                            {user?.full_name?.[0] || '?'}
+                        </div>
+                        <button onClick={onLogout} className="md:hidden" aria-label="Log out">
+                            <LogOut className="w-5 h-5" style={{ color: 'var(--danger)' }} />
+                        </button>
+                    </div>
+                </header>
 
-                {/* Content Area */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.99 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.3, duration: 0.5 }}
-                    className="flex-1 overflow-y-auto p-8 z-10 scrollbar-thin"
-                >
+                <div className="flex-1 overflow-y-auto p-4 md:p-8 z-10 pb-24 md:pb-8 animate-fade-in">
                     {children}
-                </motion.div>
+                </div>
             </main>
+
+            {/* Bottom navigation -- mobile only (section 7/32) */}
+            <nav
+                className="md:hidden fixed bottom-0 inset-x-0 z-40 flex border-t"
+                style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+                aria-label="Primary"
+            >
+                {menuItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = item.id === activeTab;
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => onTabChange(item.id)}
+                            aria-current={isActive ? 'page' : undefined}
+                            className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold min-h-[56px]"
+                            style={{ color: isActive ? 'var(--primary)' : 'var(--text-secondary)' }}
+                        >
+                            <Icon className="w-5 h-5" />
+                            {item.label}
+                        </button>
+                    );
+                })}
+            </nav>
         </div>
     );
 };

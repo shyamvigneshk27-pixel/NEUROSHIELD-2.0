@@ -11,3 +11,11 @@ scikit-learn
 google-genai
 python-dotenv
 opencv-python-headless
+scipy
+
+# --- Foundations pass: auth, DB, EDF pipeline ---
+sqlalchemy
+pyjwt
+bcrypt
+mne
+pydantic[email]
