@@ -57,10 +57,10 @@ const UploadSection = ({ onUpload, type = 'csv', label = 'Upload EEG Data (CSV)'
                 tabIndex={0}
                 aria-label={label}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
-                className="group relative h-44 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-200 hover:border-slate-400 hover:shadow-sm"
+                className="group relative h-44 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-200 hover:border-slate-400 hover:shadow-sm backdrop-blur-sm"
                 style={{
                     borderColor: isDragging ? 'var(--secondary)' : file ? 'var(--success)' : 'var(--border)',
-                    background: isDragging ? 'rgba(69,123,157,0.08)' : file ? 'rgba(47,133,90,0.05)' : 'var(--surface-muted)',
+                    background: isDragging ? 'rgba(69,123,157,0.10)' : file ? 'rgba(47,133,90,0.06)' : 'var(--surface-muted)',
                 }}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}

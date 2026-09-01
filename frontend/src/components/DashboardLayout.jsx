@@ -44,7 +44,7 @@ const DashboardLayout = ({ children, activeTab, onTabChange, user, onLogout }) =
 
             {/* Sidebar -- desktop / tablet */}
             <aside
-                className="hidden md:flex w-20 lg:w-64 flex-col items-center lg:items-start py-6 z-40 border-r"
+                className="hidden md:flex w-20 lg:w-64 flex-col items-center lg:items-start py-6 z-40 border-r backdrop-blur-md"
                 style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
             >
                 <div className="mb-10 px-5 flex items-center gap-3">
