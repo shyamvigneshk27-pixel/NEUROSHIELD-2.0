@@ -158,7 +158,7 @@ const AnalysisView = ({
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap gap-1 p-1 rounded-2xl w-fit" style={{ background: 'var(--surface-muted)' }}>
+            <div className="flex flex-wrap gap-1.5 p-1.5 rounded-2xl w-fit border" style={{ background: 'var(--surface-muted)', borderColor: 'var(--border)' }}>
                 {subTabs.map(tab => {
                     const Icon = tab.icon;
                     const isActive = subTab === tab.id;
@@ -166,19 +166,19 @@ const AnalysisView = ({
                         <button
                             key={tab.id}
                             onClick={() => setSubTab(tab.id)}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                            className="group flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer"
                             style={isActive
-                                ? { background: 'var(--surface)', color: 'var(--primary)', boxShadow: '0 1px 2px rgba(29,53,87,0.10)' }
+                                ? { background: 'var(--surface)', color: 'var(--primary)', boxShadow: '0 1px 3px rgba(29,53,87,0.10)' }
                                 : { color: 'var(--text-secondary)' }}
                         >
-                            <Icon className="w-4 h-4" />
-                            {tab.id}
+                            <Icon className={`w-4 h-4 transition-transform duration-150 ${isActive ? 'scale-110 text-primary' : 'group-hover:scale-110 group-hover:text-primary'}`} />
+                            <span className="transition-transform duration-150 group-hover:translate-x-0.5">{tab.id}</span>
                         </button>
                     );
                 })}
             </div>
 
-            <div key={subTab} className="animate-fade-in">
+            <div key={subTab} className="animate-fade-in-up">
                 {renderSubTabContent()}
             </div>
         </div>

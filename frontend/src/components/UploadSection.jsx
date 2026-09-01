@@ -57,10 +57,10 @@ const UploadSection = ({ onUpload, type = 'csv', label = 'Upload EEG Data (CSV)'
                 tabIndex={0}
                 aria-label={label}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
-                className="relative h-44 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors"
+                className="group relative h-44 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-200 hover:border-slate-400 hover:shadow-sm"
                 style={{
                     borderColor: isDragging ? 'var(--secondary)' : file ? 'var(--success)' : 'var(--border)',
-                    background: isDragging ? 'rgba(69,123,157,0.06)' : file ? 'rgba(47,133,90,0.05)' : 'var(--surface-muted)',
+                    background: isDragging ? 'rgba(69,123,157,0.08)' : file ? 'rgba(47,133,90,0.05)' : 'var(--surface-muted)',
                 }}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
@@ -76,19 +76,19 @@ const UploadSection = ({ onUpload, type = 'csv', label = 'Upload EEG Data (CSV)'
                 />
 
                 {file ? (
-                    <div className="flex flex-col items-center gap-2 px-4 text-center animate-fade-in">
-                        <div className="p-3 rounded-xl" style={{ background: 'rgba(47,133,90,0.14)' }}>
+                    <div className="flex flex-col items-center gap-2 px-4 text-center animate-fade-in-up">
+                        <div className="p-3 rounded-xl transition-transform duration-200 hover:scale-105" style={{ background: 'rgba(47,133,90,0.14)' }}>
                             <CheckCircle className="w-7 h-7" style={{ color: 'var(--success)' }} />
                         </div>
                         <p className="font-semibold text-sm truncate max-w-[220px]" style={{ color: 'var(--text-primary)' }}>{file.name}</p>
-                        <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Ready for analysis — click to replace</p>
+                        <p className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>Ready for analysis — click to replace</p>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center gap-3 text-center px-4">
-                        <div className="p-3.5 rounded-xl" style={{ background: 'rgba(69,123,157,0.10)' }}>
-                            <Upload className="w-6 h-6" style={{ color: 'var(--secondary)' }} />
+                        <div className="p-3.5 rounded-xl transition-transform duration-200 group-hover:-translate-y-1 group-hover:scale-105" style={{ background: 'rgba(69,123,157,0.10)' }}>
+                            <Upload className="w-6 h-6 transition-colors duration-150 group-hover:text-primary" style={{ color: 'var(--secondary)' }} />
                         </div>
-                        <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Drag & drop, or click to browse</p>
+                        <p className="font-semibold text-sm transition-colors duration-150 group-hover:text-primary" style={{ color: 'var(--text-primary)' }}>Drag & drop, or click to browse</p>
                         {hint && <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{hint}</p>}
                     </div>
                 )}
